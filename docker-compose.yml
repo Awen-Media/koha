@@ -1,0 +1,37 @@
+version: "3.0"
+services:
+    db:
+        image: mariadb:10.3
+        restart: 'always'
+        volumes:
+            - ${PWD}/mariadb:/var/lib/mysql
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+            MYSQL_DATABASE: koha
+            MYSQL_USER: koha
+            MYSQL_PASSWORD: koha
+
+    memcached:
+        image: memcached:alpine
+        restart: 'always'
+
+    elasticsearch:
+        image: koha/elasticsearch-icu:6.x
+        restart: 'always'
+        environment:
+            discovery.type: single-node
+
+    web:
+        image: awenmedia/koha:latest
+        restart: 'always'
+        volumes:
+            - ${PWD}/koha:/home/koha/koha
+        ports:
+            - 8080:5000
+            - 80:5001
+        depends_on:
+            - db
+            - memcached
+            - elasticsearch
