@@ -1,3 +1,6 @@
+koha/
+mariadb/
+
 # Logs
 logs
 *.log

@@ -55,9 +55,22 @@ RUN apt-get update && apt-get --no-install-recommends -y install \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /usr/share/koha
-#RUN mkdir /usr/share/koha/bin
-#COPY koha-functions.sh  /usr/share/koha/bin/koha-functions.sh
 RUN ln -s /home/koha/koha/debian/scripts /usr/share/koha/bin
+
+# Link OPAC files and translator files
+RUN mkdir /opac
+RUN mkdir /opac/htdocs
+RUN mkdir /opac/htdocs/opac-tmpl
+#RUN mkdir /opac/htdocs/intranet-tmpl
+RUN ln -s /home/koha/koha/koha-tmpl/opac-tmpl /opac/htdocs/opac-tmpl/bootstrap
+
+#/misc/translator/po
+RUN ln -s /home/koha/koha/misc/ /misc
+
+# Configure sites
+RUN mkdir /etc/koha
+RUN mkdir /etc/koha/sites
+RUN ln -s /home/koha/etc/koha-conf.xml /etc/koha/koha-conf.xml
 
 RUN adduser --disabled-password --gecos '' koha
 
@@ -66,7 +79,6 @@ USER koha
 WORKDIR /home/koha
 
 COPY --from=builder --chown=koha:koha /app .
-
 COPY --chown=koha:koha koha-conf.xml.in etc/
 COPY --chown=koha:koha log4perl.conf etc/
 
@@ -74,7 +86,9 @@ COPY --chown=koha:koha log4perl.conf etc/
 COPY koha.crontab.ini /etc/cron.d/koha
 RUN crontab /etc/cron.d/koha
 
+#Environment vars used by koha_conf file
 ENV KOHA_CONF /home/koha/etc/koha-conf.xml
+ENV ZEBRA_CONF_DIR /home/koha/koha/etc/zebradb
 ENV PERL5LIB /home/koha/koha:/home/koha/.local/lib/perl5
 ENV PATH /home/koha/.local/bin:$PATH
 ENV LC_ALL es_MX.UTF-8
@@ -84,6 +98,7 @@ ENV KOHA_CRON_PATH=/home/koha/koha/misc/cronjobs
 
 EXPOSE 5000 5001
 
+COPY koha-custom.sh /home/koha/libs/koha-custom.sh
 COPY docker-entrypoint.sh /usr/local/bin/
 
 WORKDIR /home/koha/koha
