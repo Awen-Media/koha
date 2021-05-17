@@ -13,7 +13,6 @@ Before to run a container, you need to create a .env file like a next (or check 
     LANGUAGE=es_MX.UTF-8
 
     #Koha configuration
-    KOHA_RELEASE=20.05
     KOHA_LANGS=es-ES
     KOHA_INSTANCE=awen
     MYSQL_DATABASE=koha_awen
