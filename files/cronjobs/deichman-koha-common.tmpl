@@ -1,0 +1,147 @@
+# /etc/cron.d/deichman-koha-common
+# local cron jobs
+# m h dom mon dow user command
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+##############
+# Update items.replacementprice from marcxml
+##############
+10 23 * * * root /cronjobs/update_items_replacementprice.sh
+
+##############
+# Update items.ccode zone position from marcxml
+##############
+15 23 * * * root /cronjobs/update_items_ccode.sh
+
+##############
+# NL - sync TO Koha
+##############
+20 23 * * *  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/nl-sync-to-koha.pl -v -r
+
+##############
+# NL - sync FROM Koha
+##############
+0 * * * *  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/nl-sync-from-koha.pl -v -r
+
+##############
+# Build Holds Queue
+# run every 5/min between 8-11, 15/min between 11-19 mon-sat
+##############
+*/5  7-10  * * 1-6  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/holds/build_holds_queue.pl
+*/15 11-19 * * 1-6  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/holds/build_holds_queue.pl
+
+##############
+# Anonymize patron history
+# First creates stats and populates anonymous_stats table
+# then moves history in old_issues to syspref AnonymousPatron or NULL if not set
+#   --days	days to keep history
+# also anonymizes items_last_borrower
+##############
+40 23 * * *   root koha-foreach --enabled /cronjobs/anonymous_stats.sh --days 3
+55 23 * * *   root koha-foreach --enabled /usr/share/koha/bin/cronjobs/batch_anonymise.pl --days 3 -v
+58 23 * * *   root koha-foreach --enabled /cronjobs/anonymize_last_borrower.sh --days 3 -v
+59 23 * * *   root koha-foreach --enabled /cronjobs/delete_borrower_messages.sh --days 182 -v
+
+##############
+# Long overdue - 02:00 every night
+# Settings for long overdue are in sysprefs, but does not seem to be working (as of 04.10.2016),
+# therfore setting specifically here.
+# 	--confirm		actually handle overdues
+#   --lost 35=12    set item status to "Forlengst forfalt" (code: 12) for 35 days overdue exactly.
+#   --charge 12		charge patron for items set to Forlengst forfalt (code: 12)
+##############
+0 2 * * *    root koha-foreach --enabled /usr/share/koha/bin/cronjobs/longoverdue.pl --lost 35=12 --charge 12 --maxdays=36 --confirm
+
+##############
+# Kemnersaker + Send reports to email
+#   -e   email to receive report (can be multiple)
+#   -s   store results in koha
+##############
+0 4 * * *   root koha-foreach --enabled /cronjobs/kemnersaker.sh
+45 4 * * *   root koha-foreach --enabled /cronjobs/send_reports.sh -e benjamin.rokseth@deichman.no -e kirsten.partapuoli@kem.oslo.kommune.no -e raakel.rosenborg@deichman.no -e cecilie.bergh@deichman.no -e deichman.inkasso@deb.oslo.kommune.no
+
+##############
+# purresaker and overdue messages
+# Replacing fines.pl cronjob, managing purresaker and purresaker_issues table - fines and overdue messages for patrons
+##############
+0 5 * * *    root koha-foreach --enabled /cronjobs/purresaker.pl
+15 5 * * *    root koha-foreach --enabled /cronjobs/overdue_messages.pl
+30 5 * * *    root koha-foreach --enabled /cronjobs/debar_patrons.pl
+
+##############
+# Process notice with transport type 'print' to print service
+#   --update_status  	set status to sent or failed
+#   --print				send to print service
+#   --save				save as pdf and html
+#   --email				send attachments to this email
+#   --url				url of print service 			$ENV{'PIDGEON_URL'}
+#   --user				username of print service 		$ENV{'PIDGEON_USER'}
+#   --pass				password of print service		$ENV{'PIDGEON_PASS'}
+##############
+20 2 * * *  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/brevdue.pl --update_status --print --url $PIDGEON_URL --user $PIDGEON_USER --pass $PIDGEON_PASS
+
+##############
+# Update issue statistics in biblioitems.totalissues
+##############
+40 2 * * *  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/update_totalissues.pl --commit=1000 --use-stats --incremental
+
+##############
+# Cancel expired holds waiting and unsuspend
+##############
+15 3 * * *  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/holds/cancel_expired_holds.pl
+45 3 * * *  root koha-foreach --enabled /usr/share/koha/bin/cronjobs/holds/auto_unsuspend_holds.pl
+
+##############
+# Send hold waiting reminder
+#   --days    days waiting hold has been waiting
+##############
+0 9 * * *  root koha-foreach --enabled perl /cronjobs/holds_reminder.pl --days 7
+
+##############
+# Reset pickupnumber counter at 00:10
+##############
+10 0 * * * root echo "TRUNCATE TABLE pickup_counter;" | koha-mysql $(koha-list --enabled)
+
+##############
+# Remove debarments on juveniles with no more issues
+#############
+*/5 8-19 * * 1-6  root koha-foreach --enabled /cronjobs/unblock_juvenile_debarments.sh
+
+####################################
+# Compute plukkliste every 2 minutes
+####################################
+*/2 * * * * root cd /cronjobs; koha-foreach --enabled perl holds.compute.pl /tmp/plukkliste.json; mkdir -p /usr/share/koha/intranet/htdocs/holdsqueue; mv /tmp/plukkliste.json /usr/share/koha/intranet/htdocs/holdsqueue/plukkliste.json
+
+####################################
+# Send any pending Ill request every 3 minutes
+####################################
+*/3 7-21 * * * root koha-foreach --enabled perl /usr/share/koha/lib/Koha/Illbackends/NNCIPP/cronjobs/return_itemrequested.pl
+
+####################################
+# Explode Marc XML records into biblio_marc_tags
+####################################
+# every minute, partial
+* 3-23 * * * root koha-foreach --enabled perl /cronjobs/item_marc_exploder.pl --age=70 --ttl=40
+
+# every day, full
+7 0 * * * root koha-foreach --enabled perl /cronjobs/item_marc_exploder.pl --ttl=7200
+
+
+#########################
+# Cleanup ILL mess
+#########################
+# every morning at 00:06
+6 0 * * * root koha-foreach /cronjobs/illrequests_cleanup.sh
+
+#########################
+# Fix wrongly credited patrons
+#########################
+# every morning at 00:30
+30 0 * * * root koha-foreach /cronjobs/reset_accountlines_credit.sh
+
+####################################
+# set missing itemtypes every 15 minutes
+####################################
+*/15 * * * * root koha-foreach /cronjobs/set_itemtype.sh

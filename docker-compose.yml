@@ -1,15 +1,15 @@
 version: "3.0"
 services:
     db:
-        image: mariadb:10.3
+        image: mariadb:10.2
         restart: 'always'
         volumes:
-            - ${PWD}/mariadb:/var/lib/mysql
+            - ${PWD}/datadb:/var/lib/mysql
         ports:
             - "3306:3306"
         environment:
             MYSQL_ROOT_PASSWORD: root
-            MYSQL_DATABASE: koha
+            MYSQL_DATABASE: koha_awen
             MYSQL_USER: koha
             MYSQL_PASSWORD: koha
 
@@ -29,17 +29,3 @@ services:
             memlock:
                 soft: -1
                 hard: -1
-    web:
-        image: awenmedia/koha:latest
-        restart: 'always'
-        env_file:
-            - .env
-        volumes:
-            - ${PWD}/koha:/home/koha/koha
-        ports:
-            - 8080:5000
-            - 80:5001
-        depends_on:
-            - db
-            - memcached
-            - elasticsearch

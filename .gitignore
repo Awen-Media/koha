@@ -1,5 +1,6 @@
 koha/
 mariadb/
+.DS_Store
 
 # Logs
 logs
