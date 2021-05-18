@@ -14,25 +14,25 @@ echo "Setting up supervisord ..."
 envsubst < /templates/global/supervisord.conf.tmpl > /etc/supervisor/conf.d/supervisord.conf
 
 echo "Mysql server setup ..."
-if [ "$KOHA_DBHOST" != "localhost" ]; then
-  printf "Using linked mysql container $KOHA_DBHOST\n"
-  if ! ping -c 1 -W 1 $KOHA_DBHOST; then
-    echo "ERROR: Could not connect to remote mysql $KOHA_DBHOST"
+if [ "$MYSQL_HOST" != "localhost" ]; then
+  printf "Using linked mysql container $MYSQL_HOST\n"
+  if ! ping -c 1 -W 1 $MYSQL_HOST; then
+    echo "ERROR: Could not connect to remote mysql $MYSQL_HOST"
     exit 1
   fi
 else
-  printf "No linked mysql or unable to connect to linked mysql $KOHA_DBHOST\n-- initializing local mysql ...\n"
+  printf "No linked mysql or unable to connect to linked mysql $MYSQL_HOST\n-- initializing local mysql ...\n"
   # overlayfs fix for mysql
   find /var/lib/mysql -type f -exec touch {} \;
   /etc/init.d/mysql start
   sleep 1 # waiting for mysql to spin up on slow computers
-  echo "127.0.0.1  $KOHA_DBHOST" >> /etc/hosts
-  echo "CREATE USER '$KOHA_ADMINUSER'@'%' IDENTIFIED BY '$KOHA_ADMINPASS' ; \
-        CREATE USER '$KOHA_ADMINUSER'@'$KOHA_DBHOST' IDENTIFIED BY '$KOHA_ADMINPASS' ; \
+  echo "127.0.0.1  $MYSQL_HOST" >> /etc/hosts
+  echo "CREATE USER '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD' ; \
+        CREATE USER '$MYSQL_USER'@'$MYSQL_HOST' IDENTIFIED BY '$MYSQL_PASSWORD' ; \
         CREATE DATABASE IF NOT EXISTS koha_$KOHA_INSTANCE ; \
-        GRANT ALL ON koha_$KOHA_INSTANCE.* TO '$KOHA_ADMINUSER'@'%' WITH GRANT OPTION ; \
-        GRANT ALL ON koha_$KOHA_INSTANCE.* TO '$KOHA_ADMINUSER'@'$KOHA_DBHOST' WITH GRANT OPTION ; \
-        FLUSH PRIVILEGES ;" | mysql -u root -p$KOHA_ADMINPASS
+        GRANT ALL ON koha_$KOHA_INSTANCE.* TO '$MYSQL_USER'@'%' WITH GRANT OPTION ; \
+        GRANT ALL ON koha_$KOHA_INSTANCE.* TO '$MYSQL_USER'@'$MYSQL_HOST' WITH GRANT OPTION ; \
+        FLUSH PRIVILEGES ;" | mysql -u root -p$MYSQL_PASSWORD
 fi
 
 echo "Initializing local instance ..."
